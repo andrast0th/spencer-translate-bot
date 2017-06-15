@@ -1,9 +1,6 @@
 package co.atoth.spencertranslatebot;
 
-import com.ullink.slack.simpleslackapi.SlackChannel;
-import com.ullink.slack.simpleslackapi.SlackPreparedMessage;
-import com.ullink.slack.simpleslackapi.SlackSession;
-import com.ullink.slack.simpleslackapi.SlackUser;
+import com.ullink.slack.simpleslackapi.*;
 import com.ullink.slack.simpleslackapi.events.SlackMessagePosted;
 import com.ullink.slack.simpleslackapi.impl.SlackSessionFactory;
 import org.jsoup.Jsoup;
@@ -65,6 +62,21 @@ public class SpencerTranslateBot {
                 if(reply != null){
                     sendReplyMessage(reply, session, event);
                 }
+            }
+        });
+
+        // GREET THY KING
+        session.addPresenceChangeListener((event, presenceSession) -> {
+            SlackUser user = presenceSession.findUserByUserName("slbruce");
+
+            if(event.getPresence() == SlackPersona.SlackPresence.ACTIVE && event.getUserId().equals(user.getId())){
+
+                SlackPreparedMessage msg =
+                        new SlackPreparedMessage.Builder()
+                                .withMessage(":crown: Welcome Master Spencer! :crown: :bow: I exist to serve you. :bow:")
+                                .build();
+
+                presenceSession.sendMessageToUser(user, msg);
             }
         });
 
