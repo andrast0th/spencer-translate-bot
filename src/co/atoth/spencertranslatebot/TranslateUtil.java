@@ -6,68 +6,60 @@ import com.google.cloud.translate.Translate.TranslateOption;
 import com.google.cloud.translate.TranslateOptions;
 import com.google.cloud.translate.Translation;
 import com.google.common.collect.ImmutableList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.PrintStream;
 import java.util.List;
 
 public class TranslateUtil {
 
-    public static float isRomanian(String text, float minConfidence){
+    private static final Logger logger = LoggerFactory.getLogger(TranslateUtil.class);
+
+    public static String translateIfNeeded(String message, int minimumConfidence){
+
         Translate translate = createTranslateService();
-        List<Detection> detections = translate.detect(ImmutableList.of(text));
+
+        //Check romanian or hebrew
+        List<Detection> detections = translate.detect(ImmutableList.of(message));
+
+        logger.debug("Detecting lang for message: " + message);
         for (Detection detection : detections) {
-            if(detection.getLanguage().equals("ro") && detection.getConfidence() > minConfidence){
-                return detection.getConfidence();
+            String lang = detection.getLanguage();
+            float conf = detection.getConfidence();
+
+            logger.debug("Detected lang " + lang + " with confidence " + conf);
+
+            if("ro".equals(lang) && conf >= (minimumConfidence / 100f)){
+                return translateText(message,"ro", "en");
+            } else if ("iw".equals(lang) && conf >= (minimumConfidence / 100f)){
+                return translateText(message,"iw", "en");
             }
         }
-        return -1f;
+
+        return message;
     }
 
-    /**
-     * Translate the source text from source to target language.
-     * Make sure that your project is whitelisted.
-     *
-     * @param sourceText source text to be translated
-     * @param sourceLang source language of the text
-     * @param targetLang target language of translated text
-     * @param out print stream
-     */
-    public static void translateTextWithOptionsAndModel(
+    public static String translateText(
             String sourceText,
             String sourceLang,
-            String targetLang,
-            PrintStream out) {
+            String targetLang){
 
         Translate translate = createTranslateService();
+
         TranslateOption srcLang = TranslateOption.sourceLanguage(sourceLang);
         TranslateOption tgtLang = TranslateOption.targetLanguage(targetLang);
 
-        // Use translate `model` parameter with `base` and `nmt` options.
-        TranslateOption model = TranslateOption.model("nmt");
+        Translation translation = translate.translate(sourceText, srcLang, tgtLang);
 
-        Translation translation = translate.translate(sourceText, srcLang, tgtLang, model);
-        out.printf("Source Text:\n\tLang: %s, Text: %s\n", sourceLang, sourceText);
-        out.printf("TranslatedText:\n\tLang: %s, Text: %s\n", targetLang,
-                translation.getTranslatedText());
-    }
-
-    public static String translateRomanian(String text) {
-
-        Translate translate = createTranslateService();
-        TranslateOption srcLang = TranslateOption.sourceLanguage("ro");
-        TranslateOption tgtLang = TranslateOption.targetLanguage("en");
-
-        Translation translation = translate.translate(text, srcLang, tgtLang);
         return translation.getTranslatedText();
     }
 
-    /**
-     * Create Google Translate API Service.
-     *
-     * @return Google Translate Service
-     */
     public static Translate createTranslateService() {
-        return TranslateOptions.newBuilder().setApiKey(SpencerTranslateBot.GOOGLE_API_KEY).build().getService();
+        return TranslateOptions
+                .newBuilder()
+                .setApiKey(SpencerTranslateBot.GOOGLE_API_KEY)
+                .build()
+                .getService();
     }
 
 }
