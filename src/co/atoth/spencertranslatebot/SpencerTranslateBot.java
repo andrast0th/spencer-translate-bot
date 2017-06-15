@@ -36,7 +36,7 @@ public class SpencerTranslateBot {
                 .getSlackSessionBuilder(SLACK_API_KEY)
                 .withAutoreconnectOnDisconnection(true)
                 .withConnectionHeartbeat(5000, TimeUnit.MILLISECONDS)
-                .withProxy(Proxy.Type.HTTP, "web-proxy.eu.hpecorp.net", 8080)
+                .withProxy(Proxy.Type.HTTP, System.getProperty("http.proxyHost"), Integer.parseInt(System.getProperty("http.proxyPort")))
                 .build();
 
         session.addMessagePostedListener((event, messageSession) -> {
@@ -55,9 +55,9 @@ public class SpencerTranslateBot {
             }
 
             //Check if command parsing needed
-            String cmdReply = messageHandler.parseCommands(session.sessionPersona().getUserName(), message);
+            String cmdReply = messageHandler.parseCommands(session.sessionPersona().getId(), message);
             if(cmdReply != null){
-                sendReplyMessage(cmdReply, session, event);
+                session.sendMessage(channel, cmdReply);
             } else {
 
                 //Check if translation need
