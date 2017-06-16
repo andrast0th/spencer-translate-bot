@@ -15,13 +15,12 @@ public class SpencerTranslateBot {
 
     private static final Logger logger = LoggerFactory.getLogger(SpencerTranslateBot.class);
 
-    public static final String SLACK_API_KEY = System.getProperty("slackApiKey");
-    public static final String GOOGLE_API_KEY = System.getProperty("googleApiKey");
-    public static final String CHANNEL_NAME = System.getProperty("channelName");
+    static final String SLACK_API_KEY = System.getProperty("slackApiKey");
+    static final String GOOGLE_API_KEY = System.getProperty("googleApiKey");
+    static final String CHANNEL_NAME = System.getProperty("channelName");
 
-    public static final String MASTER_USERNAME = "slbruce";
-    public static final String MASTER_GREET = ":crown: Welcome Master Spencer! :crown: :bow: I exist to serve you. :bow:";
-
+    static final String MASTER_USERNAME = "slbruce";
+    static final String MASTER_GREET = ":crown: Welcome Master Spencer! :crown: :bow: I exist to serve you. :bow:";
 
     private static MessageHandler messageHandler = new MessageHandler();
 
@@ -65,7 +64,7 @@ public class SpencerTranslateBot {
             } else {
 
                 //Check if translation need
-                String reply = messageHandler.getTranslation(sender.getUserName(), message);
+                String reply = messageHandler.getTranslation(session, sender, message);
                 if(reply != null){
                     sendReplyMessage(reply, session, event);
                 }

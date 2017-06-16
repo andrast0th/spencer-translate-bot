@@ -7,13 +7,13 @@ apply plugin: "eu.appsatori.fatjar"
 
 sourceCompatibility = 1.8
 
-sourceSets {
-    main {
-        java {
-            srcDirs 'src'
-        }
-    }
-}
+//sourceSets {
+//    main {
+//        java {
+//            srcDirs 'src'
+//        }
+//    }
+//}
 
 repositories {
     mavenCentral()
@@ -41,6 +41,8 @@ dependencies {
     compile "com.google.guava:guava:18.0"
     compile "commons-logging:commons-logging:1.1.1"
     compile group: 'com.google.cloud', name: 'google-cloud-translate', version: '0.19.0-beta'
+
+    testCompile 'junit:junit:4.12'
 }
 
 task fatJarPlus(type: Jar) {

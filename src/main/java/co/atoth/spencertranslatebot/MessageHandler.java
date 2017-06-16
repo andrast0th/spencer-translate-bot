@@ -1,7 +1,12 @@
 package co.atoth.spencertranslatebot;
 
+import com.ullink.slack.simpleslackapi.SlackSession;
+import com.ullink.slack.simpleslackapi.SlackUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MessageHandler {
 
@@ -11,13 +16,17 @@ public class MessageHandler {
     private static boolean isOn = true;
     private static int minCert = 30;
 
-    public String getTranslation(String sender, String message){
+    public String getTranslation(SlackSession session, SlackUser sender, String messageContent){
         if(isOn){
 
-            String newMessage = TranslateUtil.translateIfNeeded(message, minCert);
+            //Replace user ids with usernames
+            messageContent = replaceUserIds(messageContent, session);
 
-            if(!newMessage.equals(message)){
-                return "*" +  sender +":* "+ newMessage;
+            String newMessage = TranslateUtil.translateIfNeeded(messageContent, minCert);
+
+            //Prepend the sender
+            if(!newMessage.equals(messageContent)){
+                return "*" +  sender.getUserName() +":* "+ newMessage;
             }
         }
         return null;
@@ -91,6 +100,29 @@ public class MessageHandler {
         helpMsg.append(">off, \n");
         helpMsg.append(">setMinCert (INT range (0,100) \n");
         return helpMsg.toString();
+    }
+
+    private static final Pattern matchUserIdPattern = Pattern.compile("(<)(.*?)(>)");
+
+    public String replaceUserIds(String message, SlackSession session){
+
+        Matcher m = matchUserIdPattern.matcher(message);
+        while (m.find()) {
+            String match = m.group();
+            String originalMatch = match;
+            match = match.replace("<", "");
+            match = match.replace(">", "");
+            match = match.replace("@", "");
+
+            //slack get username by id
+
+            SlackUser user = session.findUserById(match);
+            if(user != null){
+                String username = user.getUserName();
+                message = message.replaceFirst(originalMatch, "@" + username);
+            }
+        }
+        return message;
     }
 
 }
