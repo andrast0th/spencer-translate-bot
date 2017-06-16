@@ -21,7 +21,7 @@ public class SpencerTranslateBotMain {
     static final String GOOGLE_API_KEY = System.getProperty("googleApiKey");
 
     static final String MASTER_USERNAME = "slbruce";
-    static final String MASTER_GREET = ":crown: Long live Master Spencer! :crown: :bow: I exist to serve you. :bow:";
+    static final String MASTER_GREET = "*:crown: Long live Master Spencer! :crown: :bow: I exist to serve you. :bow:*";
 
     private static MessageHandler messageHandler = new MessageHandler();
 
@@ -31,12 +31,20 @@ public class SpencerTranslateBotMain {
         logger.debug("GOOGLE_API_KEY: " + GOOGLE_API_KEY);
         logger.debug("META: " + System.getProperty("line.separator") + messageHandler.getMetaFromManifest());
 
-        SlackSession session = SlackSessionFactory
-                .getSlackSessionBuilder(SLACK_API_KEY)
-                .withAutoreconnectOnDisconnection(true)
-                .withConnectionHeartbeat(5000, TimeUnit.MILLISECONDS)
-                .withProxy(Proxy.Type.HTTP, System.getProperty("http.proxyHost"), Integer.parseInt(System.getProperty("http.proxyPort")))
-                .build();
+        SlackSessionFactory.SlackSessionFactoryBuilder builder =
+                SlackSessionFactory
+                    .getSlackSessionBuilder(SLACK_API_KEY)
+                    .withAutoreconnectOnDisconnection(true)
+                    .withConnectionHeartbeat(5000, TimeUnit.MILLISECONDS);
+
+        //Set proxy if needed
+        if(System.getProperties().containsKey("http.proxyHost") && System.getProperties().containsKey("http.proxyPort")){
+            String proxyAddress = System.getProperty("http.proxyHost");
+            int port = Integer.parseInt(System.getProperty("http.proxyPort"));
+            builder = builder.withProxy(Proxy.Type.HTTP, proxyAddress, port);
+        }
+
+        SlackSession session = builder.build();
 
         session.addMessagePostedListener((event, messageSession) -> {
 
