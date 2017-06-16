@@ -11,7 +11,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.Proxy;
-import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
 public class SpencerTranslateBot {
@@ -57,9 +56,6 @@ public class SpencerTranslateBot {
                 if(sender.getUserName().equals(MASTER_USERNAME)){
                     cmdReply = MASTER_GREET + "\n" + cmdReply;
                 }
-
-                Collection<SlackChannel> channels = session.getChannels();
-
                 session.sendMessage(channel, cmdReply);
             } else {
 
