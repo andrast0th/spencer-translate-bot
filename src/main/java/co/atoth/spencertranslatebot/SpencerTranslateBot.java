@@ -72,23 +72,6 @@ public class SpencerTranslateBot {
             }
         });
 
-        // GREET THY KING
-        /* Disabled for now
-        session.addPresenceChangeListener((event, presenceSession) -> {
-            SlackUser user = presenceSession.findUserByUserName("slbruce");
-
-            if(event.getPresence() == SlackPersona.SlackPresence.ACTIVE && event.getUserId().equals(user.getId())){
-
-                SlackPreparedMessage msg =
-                        new SlackPreparedMessage.Builder()
-                                .withMessage(":crown: Welcome Master Spencer! :crown: :bow: I exist to serve you. :bow:")
-                                .build();
-
-                presenceSession.sendMessageToUser(user, msg);
-            }
-        });
-        */
-
         session.connect();
     }
 
