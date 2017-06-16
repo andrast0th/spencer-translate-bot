@@ -6,14 +6,18 @@ import com.ullink.slack.simpleslackapi.SlackUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.net.URL;
 import java.util.*;
+import java.util.jar.Attributes;
+import java.util.jar.Manifest;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class MessageHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(SpencerTranslateBot.class);
+    private static final Logger logger = LoggerFactory.getLogger(SpencerTranslateBotMain.class);
 
     private static String helpMsg = getHelpMsg();
     private static int minCert = 30;
@@ -113,6 +117,10 @@ public class MessageHandler {
                     return "> *help* \n" + helpMsg;
                 }
 
+                if(matchCmd(message, "meta") != null){
+                    return "> *meta* \n" + getMetaFromManifest();
+                }
+
                 String[] minCertWild = matchCmd(message, "setMinCert", "*");
                 if(minCertWild != null){
                     int minCert = Integer.parseInt(minCertWild[0]);;
@@ -157,6 +165,7 @@ public class MessageHandler {
         helpMsg.append("status - print status\n");
         helpMsg.append("on - activate on current channel \n");
         helpMsg.append("off - deactivate on current channel\n");
+        helpMsg.append("meta - print bot metadata\n");
         helpMsg.append("setMinCert (INT range (0,100) - set minimum certainty for language detection\n");
         return helpMsg.toString();
     }
@@ -187,6 +196,35 @@ public class MessageHandler {
 
     public String removeSmileys(String message){
         return message.replaceAll(matchSmileyPattern, "");
+    }
+
+    public String getMetaFromManifest(){
+
+        Class clazz = MessageHandler.class;
+        String className = clazz.getSimpleName() + ".class";
+        String classPath = clazz.getResource(className).toString();
+        if (!classPath.startsWith("jar")) {
+            // Class not from JAR
+            return null;
+        }
+
+        String manifestPath = classPath.substring(0, classPath.lastIndexOf("!") + 1) + "/META-INF/MANIFEST.MF";
+        Manifest manifest = null;
+        try {
+            manifest = new Manifest(new URL(manifestPath).openStream());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        Attributes attr = manifest.getMainAttributes();
+
+        StringBuilder metaBuilder = new StringBuilder();
+
+        attr.entrySet().stream().forEach(objectObjectEntry -> {
+            metaBuilder.append(objectObjectEntry.getKey() + ": " + objectObjectEntry.getValue() + "\n");
+        });
+
+        return metaBuilder.toString();
     }
 
 }

@@ -1,19 +1,12 @@
 group 'co.atoth'
-version '1.0-SNAPSHOT'
+version '1.0'
 
 apply plugin: 'java'
 apply plugin: "idea"
 apply plugin: "eu.appsatori.fatjar"
+apply plugin: 'net.nemerosa.versioning'
 
 sourceCompatibility = 1.8
-
-//sourceSets {
-//    main {
-//        java {
-//            srcDirs 'src'
-//        }
-//    }
-//}
 
 repositories {
     mavenCentral()
@@ -23,11 +16,13 @@ repositories {
 buildscript {
     repositories {
         maven {
+            jcenter()
             url "https://plugins.gradle.org/m2/"
         }
     }
     dependencies {
         classpath "eu.appsatori:gradle-fatjar-plugin:0.3"
+        classpath 'net.nemerosa:versioning:2.0.0'
     }
 }
 
@@ -46,11 +41,19 @@ dependencies {
 }
 
 task fatJarPlus(type: Jar) {
-    baseName = project.name + '-all'
+    archiveName = rootProject.name + ".jar"
     from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
     manifest {
-        attributes 'Implementation-Title': 'Spencer Translate Bot', 'Implementation-Version': version
-        attributes 'Main-Class': 'co.atoth.spencertranslatebot.SpencerTranslateBot'
+        attributes(
+                'Implementation-Title': 'Spencer Translate Bot',
+                'Implementation-Git-Revision': versioning.info.full,
+                'Implementation-Git-Remote': 'https://github.com/atothhpe/spencer-translate-bot',
+                'Implementation-Version': version,
+                'Built-By': System.getProperty('user.name'),
+                'Built-JDK': System.getProperty('java.version'),
+                'Build-Time': new Date().format("yyyy-MM-dd HH:mm:ss z"),
+                'Main-Class': 'co.atoth.spencertranslatebot.SpencerTranslateBotMain'
+        )
     }
 }

@@ -13,9 +13,9 @@ import java.io.IOException;
 import java.net.Proxy;
 import java.util.concurrent.TimeUnit;
 
-public class SpencerTranslateBot {
+public class SpencerTranslateBotMain {
 
-    private static final Logger logger = LoggerFactory.getLogger(SpencerTranslateBot.class);
+    private static final Logger logger = LoggerFactory.getLogger(SpencerTranslateBotMain.class);
 
     static final String SLACK_API_KEY = System.getProperty("slackApiKey");
     static final String GOOGLE_API_KEY = System.getProperty("googleApiKey");
@@ -29,8 +29,7 @@ public class SpencerTranslateBot {
 
         logger.debug("SLACK_API_KEY: " + SLACK_API_KEY);
         logger.debug("GOOGLE_API_KEY: " + GOOGLE_API_KEY);
-
-        //System.out.println(TranslateUtil.isRomanian("ce se intampla", .3f));
+        logger.debug("META: " + System.getProperty("line.separator") + messageHandler.getMetaFromManifest());
 
         SlackSession session = SlackSessionFactory
                 .getSlackSessionBuilder(SLACK_API_KEY)

@@ -83,7 +83,7 @@ public class TranslateUtil {
     public static Translate createTranslateService() {
         return TranslateOptions
                 .newBuilder()
-                .setApiKey(SpencerTranslateBot.GOOGLE_API_KEY)
+                .setApiKey(SpencerTranslateBotMain.GOOGLE_API_KEY)
                 .build()
                 .getService();
     }
