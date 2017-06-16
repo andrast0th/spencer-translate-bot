@@ -19,6 +19,10 @@ public class SpencerTranslateBot {
     public static final String GOOGLE_API_KEY = System.getProperty("googleApiKey");
     public static final String CHANNEL_NAME = System.getProperty("channelName");
 
+    public static final String MASTER_USERNAME = "slbruce";
+    public static final String MASTER_GREET = ":crown: Welcome Master Spencer! :crown: :bow: I exist to serve you. :bow:";
+
+
     private static MessageHandler messageHandler = new MessageHandler();
 
     public static void main(String[] args) throws IOException {
@@ -54,6 +58,9 @@ public class SpencerTranslateBot {
             //Check if command parsing needed
             String cmdReply = messageHandler.parseCommands(session.sessionPersona().getId(), message);
             if(cmdReply != null){
+                if(sender.getUserName().equals(MASTER_USERNAME)){
+                    cmdReply = MASTER_GREET + "\n" + cmdReply;
+                }
                 session.sendMessage(channel, cmdReply);
             } else {
 
@@ -66,6 +73,7 @@ public class SpencerTranslateBot {
         });
 
         // GREET THY KING
+        /* Disabled for now
         session.addPresenceChangeListener((event, presenceSession) -> {
             SlackUser user = presenceSession.findUserByUserName("slbruce");
 
@@ -79,6 +87,7 @@ public class SpencerTranslateBot {
                 presenceSession.sendMessageToUser(user, msg);
             }
         });
+        */
 
         session.connect();
     }
