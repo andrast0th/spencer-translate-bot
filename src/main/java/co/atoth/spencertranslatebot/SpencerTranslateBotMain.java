@@ -38,20 +38,24 @@ public class SpencerTranslateBotMain {
             throw new RuntimeException("GOOGLE_API_KEY vm argument missing, exiting...");
         }
 
-        SlackSessionFactory.SlackSessionFactoryBuilder builder =
-                SlackSessionFactory
-                    .getSlackSessionBuilder(SLACK_API_KEY)
-                    .withAutoreconnectOnDisconnection(true)
-                    .withConnectionHeartbeat(5000, TimeUnit.MILLISECONDS);
+        SlackSession session;
 
         //Set proxy if needed
         if(System.getProperties().containsKey("http.proxyHost") && System.getProperties().containsKey("http.proxyPort")){
             String proxyAddress = System.getProperty("http.proxyHost");
             int port = Integer.parseInt(System.getProperty("http.proxyPort"));
-            builder = builder.withProxy(Proxy.Type.HTTP, proxyAddress, port);
-        }
 
-        SlackSession session = builder.build();
+            session = SlackSessionFactory
+                        .getSlackSessionBuilder(SLACK_API_KEY)
+                        .withAutoreconnectOnDisconnection(true)
+                        .withConnectionHeartbeat(5000, TimeUnit.MILLISECONDS)
+                        .withProxy(Proxy.Type.HTTP, proxyAddress, port)
+                        .build();
+
+        } else {
+            session = SlackSessionFactory
+                    .createWebSocketSlackSession(SLACK_API_KEY);
+        }
 
         session.addMessagePostedListener((event, messageSession) -> {
 
