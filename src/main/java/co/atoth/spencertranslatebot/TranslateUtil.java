@@ -6,6 +6,7 @@ import com.google.cloud.translate.Translate.TranslateOption;
 import com.google.cloud.translate.TranslateOptions;
 import com.google.cloud.translate.Translation;
 import com.google.common.collect.ImmutableList;
+import org.jsoup.Jsoup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,7 +18,21 @@ public class TranslateUtil {
     private static final DecimalFormat df = new DecimalFormat("#");
     private static final Logger logger = LoggerFactory.getLogger(TranslateUtil.class);
 
-    public static final String[] translatedLanguages = new String[]{"ro", "iw"};
+    public enum Lang {
+        IW("il"), RO("ro");
+
+        public String country;
+        private Lang(String country){
+            this.country = country;
+        }
+
+        @Override
+        public String toString() {
+            return this.name().toLowerCase();
+        }
+    }
+
+    public static final Lang[] translatedLanguages = new Lang[]{Lang.IW, Lang.RO};
     public static final String TRANSLATE_TO_LANG = "en";
 
     public static String translateIfNeeded(String message, int minimumConfidence){
@@ -34,10 +49,11 @@ public class TranslateUtil {
             String confStr = df.format(conf) + "%";
 
             logger.debug("Detected lang " + lang + " with confidence " + conf);
-            for(String supportedLang : translatedLanguages){
-                if(supportedLang.equals(lang) && conf >= minimumConfidence) {
-                    String translation = translateText(message, supportedLang, TRANSLATE_TO_LANG);
-                    return getFlagForLang(lang) + ": " + confStr + "\n" + translation;
+            for(Lang supportedLang : translatedLanguages){
+                if(supportedLang.toString().equals(lang) && conf >= minimumConfidence) {
+                    String translation = translateText(message, supportedLang.toString(), TRANSLATE_TO_LANG);
+                    translation = Jsoup.parse(translation).text();
+                    return "*" + getFlagForLang(supportedLang.country) + " " + confStr + "*\n" + translation;
                 }
             }
         }

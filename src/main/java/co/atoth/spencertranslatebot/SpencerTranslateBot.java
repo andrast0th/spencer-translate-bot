@@ -1,14 +1,17 @@
 package co.atoth.spencertranslatebot;
 
-import com.ullink.slack.simpleslackapi.*;
+import com.ullink.slack.simpleslackapi.SlackChannel;
+import com.ullink.slack.simpleslackapi.SlackPreparedMessage;
+import com.ullink.slack.simpleslackapi.SlackSession;
+import com.ullink.slack.simpleslackapi.SlackUser;
 import com.ullink.slack.simpleslackapi.events.SlackMessagePosted;
 import com.ullink.slack.simpleslackapi.impl.SlackSessionFactory;
-import org.jsoup.Jsoup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.Proxy;
+import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
 public class SpencerTranslateBot {
@@ -17,10 +20,9 @@ public class SpencerTranslateBot {
 
     static final String SLACK_API_KEY = System.getProperty("slackApiKey");
     static final String GOOGLE_API_KEY = System.getProperty("googleApiKey");
-    static final String CHANNEL_NAME = System.getProperty("channelName");
 
     static final String MASTER_USERNAME = "slbruce";
-    static final String MASTER_GREET = ":crown: Welcome Master Spencer! :crown: :bow: I exist to serve you. :bow:";
+    static final String MASTER_GREET = ":crown: Long live Master Spencer! :crown: :bow: I exist to serve you. :bow:";
 
     private static MessageHandler messageHandler = new MessageHandler();
 
@@ -28,7 +30,6 @@ public class SpencerTranslateBot {
 
         logger.debug("SLACK_API_KEY: " + SLACK_API_KEY);
         logger.debug("GOOGLE_API_KEY: " + GOOGLE_API_KEY);
-        logger.debug("CHANNEL_NAME: " + CHANNEL_NAME);
 
         //System.out.println(TranslateUtil.isRomanian("ce se intampla", .3f));
 
@@ -49,19 +50,23 @@ public class SpencerTranslateBot {
             if(session.sessionPersona().getId().equals(event.getSender().getId())){
                 return;
             }
-            //Channel filter if set
-            if(!channel.getName().equals(CHANNEL_NAME)){
-                return;
-            }
 
             //Check if command parsing needed
-            String cmdReply = messageHandler.parseCommands(session.sessionPersona().getId(), message);
+            String cmdReply = messageHandler.parseCommands(session, channel, message);
             if(cmdReply != null){
                 if(sender.getUserName().equals(MASTER_USERNAME)){
                     cmdReply = MASTER_GREET + "\n" + cmdReply;
                 }
+
+                Collection<SlackChannel> channels = session.getChannels();
+
                 session.sendMessage(channel, cmdReply);
             } else {
+
+                //Check if active on this channel
+                if(!messageHandler.isActive(channel)){
+                    return;
+                }
 
                 //Check if translation need
                 String reply = messageHandler.getTranslation(session, sender, message);
@@ -105,7 +110,7 @@ public class SpencerTranslateBot {
         SlackPreparedMessage msg =
                 new SlackPreparedMessage.Builder()
                         .withThreadTimestamp(replyTimeStamp)
-                        .withMessage(Jsoup.parse(message).text())
+                        .withMessage(message)
                         .build();
 
         session.sendMessage(channel, msg);

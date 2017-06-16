@@ -1,51 +1,122 @@
 package co.atoth.spencertranslatebot;
 
+import com.ullink.slack.simpleslackapi.SlackChannel;
 import com.ullink.slack.simpleslackapi.SlackSession;
 import com.ullink.slack.simpleslackapi.SlackUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class MessageHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(SpencerTranslateBot.class);
 
     private static String helpMsg = getHelpMsg();
-    private static boolean isOn = true;
     private static int minCert = 30;
+    private static Set<String> activeSlackChannelIds = new LinkedHashSet<>();
 
-    public String getTranslation(SlackSession session, SlackUser sender, String messageContent){
-        if(isOn){
+    public boolean activate(SlackChannel channel){
+        if(channel.getId() == null || channel.getType() == SlackChannel.SlackChannelType.INSTANT_MESSAGING){
+            return false;
+        }
+        return activeSlackChannelIds.add(channel.getId());
+    }
 
-            //Replace user ids with usernames
-            messageContent = replaceUserIds(messageContent, session);
+    public boolean deactivate(SlackChannel channel){
+        return activeSlackChannelIds.remove(channel.getId());
+    }
 
-            String newMessage = TranslateUtil.translateIfNeeded(messageContent, minCert);
+    public boolean isActive(SlackChannel channel){
+        return activeSlackChannelIds.contains(channel.getId());
+    }
 
-            //Prepend the sender
-            if(!newMessage.equals(messageContent)){
-                return "*" +  sender.getUserName() +":* "+ newMessage;
+    public Collection <SlackChannel> getActiveChannels(SlackSession session){
+        List<SlackChannel> channels = new ArrayList<>();
+        for(String channelId : activeSlackChannelIds){
+            SlackChannel channel = session.findChannelById(channelId);
+            if(channel != null){
+                channels.add(channel);
             }
         }
+        return channels;
+    }
+
+    public String getTranslation(SlackSession session, SlackUser sender, String messageContent){
+
+        //Replace user ids with usernames
+        messageContent = replaceUserIds(messageContent, session);
+        messageContent = removeSmileys(messageContent);
+
+        String newMessage = TranslateUtil.translateIfNeeded(messageContent, minCert);
+
+        //Prepend the sender
+        if( newMessage != null){
+            return "*" +  sender.getUserName() +":* "+ newMessage;
+        }
+
         return null;
     }
 
-    public String parseCommands(String botUserId, String message){
+    public String parseCommands(SlackSession session, SlackChannel channel, String message){
+
+        String botUserId = session.sessionPersona().getId();
         String target = "<@" + botUserId + ">";
+
         if(message.contains(target)){
             message = message.replace(target, "").trim();
-            String[] cmds = message.split("\\s+");
+
             try {
-                if(parseOnOffStatus(cmds) != null){
-                    return parseOnOffStatus(cmds);
+                if(matchCmd(message, "on") != null){
+                    if(activate(channel)) {
+                        return "> *on for: " + channel.getName() + "*";
+                    } else {
+                        return "> *won't work here*";
+                    }
                 }
-                if(parseHelp(cmds) != null){
-                    return parseHelp(cmds);
+
+                if(matchCmd(message, "off") != null){
+                    if(isActive(channel)) {
+                        deactivate(channel);
+                        return "> *off for: " + channel.getName() + "*";
+                    } else {
+                        return "> *was not active on this channel*";
+                    }
                 }
-                if(parseMinCert(cmds) != null){
-                    return parseMinCert(cmds);
+
+                if(matchCmd(message, "status") != null){
+
+                    String activeChannels =
+                                    getActiveChannels(session)
+                                    .stream()
+                                    .map(SlackChannel::getName)
+                                    .collect(Collectors.joining(", "));
+
+                    if(activeChannels.isEmpty()){
+                        activeChannels = "*none*";
+                    }
+
+                    String languages = Arrays.stream(TranslateUtil.Lang.values())
+                            .map(Enum::name)
+                            .collect(Collectors.joining(", "));
+
+                    return "> *status*\n" +
+                            "supported languages: " + languages  + "\n" +
+                            "minimum certainty: " + minCert + "%\n" +
+                            "active channels: " + activeChannels;
+                }
+
+                if(matchCmd(message, "help") != null){
+                    return "> *help* \n" + helpMsg;
+                }
+
+                String[] minCertWild = matchCmd(message, "setMinCert", "*");
+                if(minCertWild != null){
+                    int minCert = Integer.parseInt(minCertWild[0]);;
+                    return "> *setMinCert*\n New minimum certainty " + minCert;
                 }
             } catch (Exception ex) {
                 //Go away
@@ -54,55 +125,44 @@ public class MessageHandler {
         return null;
     }
 
-    private static String parseMinCert(String[] cmds){
-        if(cmds.length == 2){
-            if("setMinCert".equals(cmds[0])){
-                int newMinCert = Integer.parseInt(cmds[1]);
-                if(newMinCert >= 0 && newMinCert <= 100){
-                    minCert = newMinCert;
-                    return "*setMinCert*\nNew minimum certainty " + minCert;
-                }
-            }
-        }
-        return null;
-    }
+    private static String[] matchCmd(String message, String... inputCmds){
+        String[] parsedCmds = message.split("\\s+");
 
-    private static String parseHelp(String[] cmds){
-        if(cmds.length == 1) {
-            if ("help".equals(cmds[0])) {
-                return "*help*\n" + helpMsg;
-            }
-        }
-        return null;
-    }
+        List<String> wildcards = new ArrayList<>();
 
-    private static String parseOnOffStatus(String[] cmds){
-        if(cmds.length == 1){
-            if("on".equals(cmds[0])){
-               isOn = true;
-                return ">*on*";
+        if(parsedCmds.length != inputCmds.length){
+            return null;
+        }
+
+        for(int i = 0; i < parsedCmds.length; i++){
+
+            String cmd = inputCmds[i].trim().toLowerCase();
+            String parsedCmd = parsedCmds[i].trim().toLowerCase();
+
+            // wildcards
+            if("*".equals(cmd)){
+                wildcards.add(parsedCmd);
+                continue;
             }
-            else if("off".equals(cmds[0])){
-                isOn = false;
-                return ">*off*";
-            }
-            else if("status".equals(cmds[0])){
-                return ">*status*\nactive: " + isOn + ", minimum certainty: " + minCert + "%";
+
+            if(!parsedCmds[i].equals(inputCmds[i])){
+                return null;
             }
         }
-        return null;
+        return wildcards.toArray(new String[]{});
     }
 
     private static String getHelpMsg(){
         StringBuilder helpMsg = new StringBuilder();
-        helpMsg.append(">status, \n");
-        helpMsg.append(">on, \n");
-        helpMsg.append(">off, \n");
-        helpMsg.append(">setMinCert (INT range (0,100) \n");
+        helpMsg.append("status - print status\n");
+        helpMsg.append("on - activate on current channel \n");
+        helpMsg.append("off - deactivate on current channel\n");
+        helpMsg.append("setMinCert (INT range (0,100) - set minimum certainty for language detection\n");
         return helpMsg.toString();
     }
 
     private static final Pattern matchUserIdPattern = Pattern.compile("(<)(.*?)(>)");
+    private static final String matchSmileyPattern = "(:)(.*?)(:)";
 
     public String replaceUserIds(String message, SlackSession session){
 
@@ -123,6 +183,10 @@ public class MessageHandler {
             }
         }
         return message;
+    }
+
+    public String removeSmileys(String message){
+        return message.replaceAll(matchSmileyPattern, "");
     }
 
 }
