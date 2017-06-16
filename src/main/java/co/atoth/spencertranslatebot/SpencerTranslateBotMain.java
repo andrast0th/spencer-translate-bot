@@ -31,6 +31,13 @@ public class SpencerTranslateBotMain {
         logger.debug("GOOGLE_API_KEY: " + GOOGLE_API_KEY);
         logger.debug("META: " + System.getProperty("line.separator") + messageHandler.getMetaFromManifest());
 
+        if(SLACK_API_KEY == null){
+            throw new RuntimeException("SLACK_API_KEY vm argument missing, exiting...");
+        }
+        if(GOOGLE_API_KEY == null){
+            throw new RuntimeException("GOOGLE_API_KEY vm argument missing, exiting...");
+        }
+
         SlackSessionFactory.SlackSessionFactoryBuilder builder =
                 SlackSessionFactory
                     .getSlackSessionBuilder(SLACK_API_KEY)
