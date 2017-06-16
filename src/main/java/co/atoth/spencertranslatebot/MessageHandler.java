@@ -7,7 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.*;
 import java.util.jar.Attributes;
 import java.util.jar.Manifest;
@@ -17,7 +19,7 @@ import java.util.stream.Collectors;
 
 public class MessageHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(SpencerTranslateBotMain.class);
+    private static final Logger logger = LoggerFactory.getLogger(MessageHandler.class);
 
     private static String helpMsg = getHelpMsg();
     private static int minCert = 30;
@@ -119,9 +121,7 @@ public class MessageHandler {
 
                 if(matchCmd(message, "meta") != null){
                     String meta = getMetaFromManifest();
-                    if(meta.isEmpty()){
-                        meta = "not available";
-                    }
+                    meta += "Host: " + getHostName();
                     return "> *meta* \n " + meta;
                 }
 
@@ -132,6 +132,7 @@ public class MessageHandler {
                 }
             } catch (Exception ex) {
                 //Go away
+                logger.error("Failed to parse command: " + ex);
             }
         }
         return null;
@@ -207,28 +208,40 @@ public class MessageHandler {
         Class clazz = MessageHandler.class;
         String className = clazz.getSimpleName() + ".class";
         String classPath = clazz.getResource(className).toString();
-        if (!classPath.startsWith("jar")) {
-            // Class not from JAR
-            return null;
+
+        if (classPath.startsWith("jar")) {
+
+            String manifestPath = classPath.substring(0, classPath.lastIndexOf("!") + 1) + "/META-INF/MANIFEST.MF";
+            Manifest manifest = null;
+            try {
+                manifest = new Manifest(new URL(manifestPath).openStream());
+            } catch (IOException e) {
+                logger.error("Error while reading jar manifest: ", e);
+                return "";
+            }
+
+            Attributes attr = manifest.getMainAttributes();
+            StringBuilder metaBuilder = new StringBuilder();
+            attr.entrySet().stream().forEach(objectObjectEntry -> {
+                metaBuilder.append(objectObjectEntry.getKey() + ": " + objectObjectEntry.getValue() + "\n");
+            });
+            return metaBuilder.toString();
         }
 
-        String manifestPath = classPath.substring(0, classPath.lastIndexOf("!") + 1) + "/META-INF/MANIFEST.MF";
-        Manifest manifest = null;
-        try {
-            manifest = new Manifest(new URL(manifestPath).openStream());
-        } catch (IOException e) {
-            e.printStackTrace();
+        return "";
+    }
+
+    public String getHostName(){
+        String hostname;
+        try
+        {
+            InetAddress addr = InetAddress.getLocalHost();
+            hostname = addr.getHostName();
         }
-
-        Attributes attr = manifest.getMainAttributes();
-
-        StringBuilder metaBuilder = new StringBuilder();
-
-        attr.entrySet().stream().forEach(objectObjectEntry -> {
-            metaBuilder.append(objectObjectEntry.getKey() + ": " + objectObjectEntry.getValue() + "\n");
-        });
-
-        return metaBuilder.toString();
+        catch (UnknownHostException ex){
+            hostname = "unknown";
+        }
+        return hostname;
     }
 
 }
