@@ -118,7 +118,11 @@ public class MessageHandler {
                 }
 
                 if(matchCmd(message, "meta") != null){
-                    return "> *meta* \n" + getMetaFromManifest();
+                    String meta = getMetaFromManifest();
+                    if(meta.isEmpty()){
+                        meta = "not available";
+                    }
+                    return "> *meta* \n " + meta;
                 }
 
                 String[] minCertWild = matchCmd(message, "setMinCert", "*");
