@@ -6,7 +6,9 @@ import co.atoth.spencertranslatebot.repository.google.GoogleCloudDataStoreBotRep
 import co.atoth.spencertranslatebot.translation.TranslationService;
 import co.atoth.spencertranslatebot.util.BotInfo;
 import com.google.auth.oauth2.ServiceAccountCredentials;
+import com.ullink.slack.simpleslackapi.SlackPreparedMessage;
 import com.ullink.slack.simpleslackapi.SlackSession;
+import com.ullink.slack.simpleslackapi.SlackUser;
 import com.ullink.slack.simpleslackapi.impl.SlackSessionFactory;
 import org.apache.commons.cli.*;
 import org.slf4j.Logger;
@@ -55,6 +57,13 @@ public class MainClass {
                 .hasArg()
                 .build());
 
+
+        options.addOption(Option.builder()
+                .argName("alertUserName").longOpt("alertUserName")
+                .desc("Alert this user when the bot has connected or discconeted to the Slack team")
+                .hasArg()
+                .build());
+
         CommandLineParser parser = new DefaultParser();
         CommandLine commandLine;
         try {
@@ -90,6 +99,10 @@ public class MainClass {
 
                 logger.info("MessageHandler regitered, listening for messages...");
                 session.addMessagePostedListener(messageHandler);
+
+                if(commandLine.hasOption("alertUserName")){
+                    alertUser(true, session, commandLine.getOptionValue("alertUserName"));
+                }
             }
         });
 
@@ -98,10 +111,26 @@ public class MainClass {
                 logger.info("Bot has disconnected from slack, botId: " + session.sessionPersona().getId());
                 logger.info("MessageHandler unregistered...");
                 session.removeMessagePostedListener(messageHandler);
+
+                if(commandLine.hasOption("alertUserName")){
+                    alertUser(false, session, commandLine.getOptionValue("alertUserName"));
+                }
             }
         });
 
         slackSession.connect();
+    }
+
+    private static void alertUser(boolean hasConencted, SlackSession session, String userName){
+        SlackUser user = session.findUserByUserName(userName);
+
+        if(user!=null){
+            String message = "hasConencted: " + hasConencted + "\n" + BotInfo.getInfo("\n");
+            session.sendMessageToUser(user, new SlackPreparedMessage.Builder().withMessage(message).build());
+            logger.debug("Failed to send hasConnected " + hasConencted + " alert to userName " + userName);
+        } else {
+            logger.debug("Failed to send hasConnected " + hasConencted + " alert to userName " + userName);
+        }
     }
 
     private static SlackSession initSlackSession(String slackApiKey){
