@@ -1,6 +1,5 @@
 package co.atoth.spencertranslatebot.translation;
 
-import co.atoth.spencertranslatebot.MainClass;
 import com.google.cloud.translate.Detection;
 import com.google.cloud.translate.Translate;
 import com.google.cloud.translate.Translate.TranslateOption;
@@ -25,17 +24,18 @@ public class TranslationService {
     private static final Lang[] translatedLanguages = new Lang[]{Lang.IW, Lang.RO};
     private static final String TRANSLATE_TO_LANG = "en";
 
-    private static Translate createTranslateService() {
-        return TranslateOptions
-                .newBuilder()
-                .setApiKey(MainClass.GOOGLE_API_KEY)
-                .build()
-                .getService();
+    private Translate translate;
+
+    public TranslationService(String googleTranslateApiKey){
+        this.translate =
+                TranslateOptions
+                    .newBuilder()
+                    .setApiKey(googleTranslateApiKey)
+                    .build()
+                    .getService();
     }
 
-    public static String translateIfNeeded(String message, byte minimumConfidence){
-
-        Translate translate = createTranslateService();
+    public String translateIfNeeded(String message, byte minimumConfidence){
 
         //Check romanian or hebrew
         List<Detection> detections = translate.detect(ImmutableList.of(message));
@@ -59,12 +59,10 @@ public class TranslationService {
         return null;
     }
 
-    public static String translateText(
+    private String translateText(
             String sourceText,
             String sourceLang,
             String targetLang){
-
-        Translate translate = createTranslateService();
 
         TranslateOption srcLang = TranslateOption.sourceLanguage(sourceLang);
         TranslateOption tgtLang = TranslateOption.targetLanguage(targetLang);

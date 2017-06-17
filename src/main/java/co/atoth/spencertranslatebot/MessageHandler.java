@@ -10,6 +10,7 @@ import com.ullink.slack.simpleslackapi.SlackPreparedMessage;
 import com.ullink.slack.simpleslackapi.SlackSession;
 import com.ullink.slack.simpleslackapi.SlackUser;
 import com.ullink.slack.simpleslackapi.events.SlackMessagePosted;
+import com.ullink.slack.simpleslackapi.listeners.SlackMessagePostedListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +20,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class MessageHandler {
+public class MessageHandler implements SlackMessagePostedListener{
 
     private static final Logger logger = LoggerFactory.getLogger(MessageHandler.class);
     private static String helpMsg = getHelpMsg();
@@ -28,54 +29,55 @@ public class MessageHandler {
     private static final String MASTER_GREET = "*:crown: Long live Master Spencer! :crown: :bow: I exist to serve you. :bow:*";
 
     private BotRepository botRepository;
+    private TranslationService translationService;
     private SlackSession slackSession;
 
-    public MessageHandler(BotRepository repository, SlackSession slackSession){
+    public MessageHandler(BotRepository repository, TranslationService translationService){
         this.botRepository = repository;
-        this.slackSession = slackSession;
+        this.translationService = translationService;
+    }
 
-        //Attach message listener
-        slackSession.addMessagePostedListener((event, messageSession) -> {
+    @Override
+    public void onEvent(SlackMessagePosted event, SlackSession session) {
+        this.slackSession = session;
+        SlackChannel channel = event.getChannel();
+        SlackUser sender = event.getSender();
+        String message  = event.getMessageContent();
 
-            SlackChannel channel = event.getChannel();
-            SlackUser sender = event.getSender();
-            String message  = event.getMessageContent();
+        //Self filter
+        if(slackSession.sessionPersona().getId().equals(event.getSender().getId())){
+            return;
+        }
 
-            //Self filter
-            if(slackSession.sessionPersona().getId().equals(event.getSender().getId())){
+        //Check if command parsing needed
+        String cmdReply = parseCommands(channel, message);
+        if(cmdReply != null){
+            if(sender.getUserName().equals(MASTER_USERNAME)){
+                cmdReply = MASTER_GREET + "\n" + cmdReply;
+            }
+            slackSession.sendMessage(channel, cmdReply);
+        } else {
+
+            //Check if active on this channel
+            if(!botRepository.isActiveOnChannel(channel.getId())){
                 return;
             }
 
-            //Check if command parsing needed
-            String cmdReply = parseCommands(channel, message);
-            if(cmdReply != null){
-                if(sender.getUserName().equals(MASTER_USERNAME)){
-                    cmdReply = MASTER_GREET + "\n" + cmdReply;
-                }
-                slackSession.sendMessage(channel, cmdReply);
-            } else {
-
-                //Check if active on this channel
-                if(!botRepository.isActiveOnChannel(channel.getId())){
-                    return;
-                }
-
-                //Check if translation need
-                String reply = getTranslation(sender, message);
-                if(reply != null){
-                    sendReplyMessage(reply, event);
-                }
+            //Check if translation need
+            String reply = getTranslation(sender, message);
+            if(reply != null){
+                sendReplyMessage(reply, event);
             }
-        });
+        }
     }
 
-    public String getTranslation(SlackUser sender, String messageContent){
+    private String getTranslation(SlackUser sender, String messageContent){
 
         //Replace user ids with usernames
         messageContent = SlackMessageUtil.replaceUserIds(messageContent, slackSession);
         messageContent = SlackMessageUtil.removeSmileys(messageContent);
 
-        String newMessage = TranslationService.translateIfNeeded(messageContent, botRepository.getMinimumConfidence());
+        String newMessage = translationService.translateIfNeeded(messageContent, botRepository.getMinimumConfidence());
 
         //Prepend the sender
         if( newMessage != null){
@@ -85,7 +87,7 @@ public class MessageHandler {
         return null;
     }
 
-    public String parseCommands(SlackChannel channel, String message){
+    private String parseCommands(SlackChannel channel, String message){
 
         String botUserId = slackSession.sessionPersona().getId();
         String target = "<@" + botUserId + ">";
