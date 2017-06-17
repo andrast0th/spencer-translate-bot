@@ -39,14 +39,20 @@ public class GoogleCloudDataStoreBotRepository implements BotRepository {
     public boolean isActiveOnChannel(String channelId) {
         //KeyFactory keyFactory = datastore.newKeyFactory().setKind(KIND_ACTIVE_CHANNEL);
         //return datastore.get(keyFactory.newKey(channelId)) != null;
-
+        if(channelId == null){
+            return false;
+        }
         return activeSlackChannelIds.contains(channelId);
     }
 
     @Override
     public boolean activateOnChannel(String channelId) {
-        if (isActiveOnChannel(channelId)) {
+        if(channelId == null){
             return false;
+        }
+
+        if (isActiveOnChannel(channelId)) {
+            return true;
         }
 
         KeyFactory keyFactory = datastore.newKeyFactory().setKind(KIND_ACTIVE_CHANNEL);
@@ -64,6 +70,9 @@ public class GoogleCloudDataStoreBotRepository implements BotRepository {
 
     @Override
     public boolean deactivateOnChannel(String channelId) {
+        if(channelId == null){
+            return false;
+        }
         if (!isActiveOnChannel(channelId)) {
             return false;
         }
