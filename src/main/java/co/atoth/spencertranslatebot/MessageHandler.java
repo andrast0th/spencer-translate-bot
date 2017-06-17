@@ -32,7 +32,7 @@ public class MessageHandler implements SlackMessagePostedListener{
     private TranslationService translationService;
     private SlackSession slackSession;
 
-    public MessageHandler(BotRepository repository, TranslationService translationService){
+    MessageHandler(BotRepository repository, TranslationService translationService){
         this.botRepository = repository;
         this.translationService = translationService;
     }
@@ -131,7 +131,7 @@ public class MessageHandler implements SlackMessagePostedListener{
 
                     return "> *status*\n" +
                             "supported languages: " + languages  + "\n" +
-                            "minimum certainty: " + botRepository.getMinimumConfidence() + "%\n" +
+                            "minimum confidence: " + botRepository.getMinimumConfidence() + "%\n" +
                             "active channels: " + activeChannels;
                 }
 
@@ -144,10 +144,21 @@ public class MessageHandler implements SlackMessagePostedListener{
                     return "> *botInfo* \n " + buildInfo;
                 }
 
-                String[] minCertWild = matchCmd(message, "setMinCert", "*");
-                if(minCertWild != null){
-                    int minCert = Integer.parseInt(minCertWild[0]);;
-                    return "> *setMinCert*\n New minimum certainty " + minCert;
+                String[] minConfWild = matchCmd(message, "setMinConf", "*");
+                if(minConfWild != null){
+                    try{
+                        byte minConf = Byte.parseByte(minConfWild[0]);
+
+                        if(minConf < 0 || minConf > 100){
+                            return "> *setMinConfidece* \n Invalid minimum confidence, must be a number between 0 and 100";
+                        }
+
+                        botRepository.saveMinimumConfidence(minConf);
+                        return "> *setMinConf*\n New minimum confidence " + minConf;
+
+                    } catch (NumberFormatException ex){
+                        return "> *setMinConfidece* \n Invalid minimum confidence, must be a number between 0 and 100";
+                    }
                 }
             } catch (Exception ex) {
                 //Go away
@@ -189,7 +200,7 @@ public class MessageHandler implements SlackMessagePostedListener{
                "on - activate on current channel \n" +
                "off - deactivate on current channel\n" +
                "botInfo - print bot build information and current host\n" +
-               "setMinCert (INT range (0,100) - set minimum certainty for language detection\n";
+               "setMinConf (INT range (0,100) - set minimum confidence for language detection\n";
     }
 
     private Collection<SlackChannel> getActiveChannels(){
