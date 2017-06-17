@@ -1,63 +1,81 @@
 package co.atoth.spencertranslatebot;
 
+import co.atoth.spencertranslatebot.repository.BotRepository;
+import co.atoth.spencertranslatebot.translation.Lang;
+import co.atoth.spencertranslatebot.translation.TranslationService;
+import co.atoth.spencertranslatebot.util.BotInfo;
+import co.atoth.spencertranslatebot.util.SlackMessageUtil;
 import com.ullink.slack.simpleslackapi.SlackChannel;
+import com.ullink.slack.simpleslackapi.SlackPreparedMessage;
 import com.ullink.slack.simpleslackapi.SlackSession;
 import com.ullink.slack.simpleslackapi.SlackUser;
+import com.ullink.slack.simpleslackapi.events.SlackMessagePosted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.URL;
-import java.net.UnknownHostException;
-import java.util.*;
-import java.util.jar.Attributes;
-import java.util.jar.Manifest;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class MessageHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(MessageHandler.class);
-
     private static String helpMsg = getHelpMsg();
-    private static int minCert = 30;
-    private static Set<String> activeSlackChannelIds = new LinkedHashSet<>();
 
-    public boolean activate(SlackChannel channel){
-        if(channel.getId() == null || channel.getType() == SlackChannel.SlackChannelType.INSTANT_MESSAGING){
-            return false;
-        }
-        return activeSlackChannelIds.add(channel.getId());
-    }
+    private static final String MASTER_USERNAME = "slbruce";
+    private static final String MASTER_GREET = "*:crown: Long live Master Spencer! :crown: :bow: I exist to serve you. :bow:*";
 
-    public boolean deactivate(SlackChannel channel){
-        return activeSlackChannelIds.remove(channel.getId());
-    }
+    private BotRepository botRepository;
+    private SlackSession slackSession;
 
-    public boolean isActive(SlackChannel channel){
-        return activeSlackChannelIds.contains(channel.getId());
-    }
+    public MessageHandler(BotRepository repository, SlackSession slackSession){
+        this.botRepository = repository;
+        this.slackSession = slackSession;
 
-    public Collection <SlackChannel> getActiveChannels(SlackSession session){
-        List<SlackChannel> channels = new ArrayList<>();
-        for(String channelId : activeSlackChannelIds){
-            SlackChannel channel = session.findChannelById(channelId);
-            if(channel != null){
-                channels.add(channel);
+        //Attach message listener
+        slackSession.addMessagePostedListener((event, messageSession) -> {
+
+            SlackChannel channel = event.getChannel();
+            SlackUser sender = event.getSender();
+            String message  = event.getMessageContent();
+
+            //Self filter
+            if(slackSession.sessionPersona().getId().equals(event.getSender().getId())){
+                return;
             }
-        }
-        return channels;
+
+            //Check if command parsing needed
+            String cmdReply = parseCommands(channel, message);
+            if(cmdReply != null){
+                if(sender.getUserName().equals(MASTER_USERNAME)){
+                    cmdReply = MASTER_GREET + "\n" + cmdReply;
+                }
+                slackSession.sendMessage(channel, cmdReply);
+            } else {
+
+                //Check if active on this channel
+                if(!botRepository.isActiveOnChannel(channel.getId())){
+                    return;
+                }
+
+                //Check if translation need
+                String reply = getTranslation(sender, message);
+                if(reply != null){
+                    sendReplyMessage(reply, event);
+                }
+            }
+        });
     }
 
-    public String getTranslation(SlackSession session, SlackUser sender, String messageContent){
+    public String getTranslation(SlackUser sender, String messageContent){
 
         //Replace user ids with usernames
-        messageContent = replaceUserIds(messageContent, session);
-        messageContent = removeSmileys(messageContent);
+        messageContent = SlackMessageUtil.replaceUserIds(messageContent, slackSession);
+        messageContent = SlackMessageUtil.removeSmileys(messageContent);
 
-        String newMessage = TranslateUtil.translateIfNeeded(messageContent, minCert);
+        String newMessage = TranslationService.translateIfNeeded(messageContent, botRepository.getMinimumConfidence());
 
         //Prepend the sender
         if( newMessage != null){
@@ -67,9 +85,9 @@ public class MessageHandler {
         return null;
     }
 
-    public String parseCommands(SlackSession session, SlackChannel channel, String message){
+    public String parseCommands(SlackChannel channel, String message){
 
-        String botUserId = session.sessionPersona().getId();
+        String botUserId = slackSession.sessionPersona().getId();
         String target = "<@" + botUserId + ">";
 
         if(message.contains(target)){
@@ -77,7 +95,7 @@ public class MessageHandler {
 
             try {
                 if(matchCmd(message, "on") != null){
-                    if(activate(channel)) {
+                    if(botRepository.activateOnChannel(channel.getId())) {
                         return "> *on for: " + channel.getName() + "*";
                     } else {
                         return "> *won't work here*";
@@ -85,8 +103,8 @@ public class MessageHandler {
                 }
 
                 if(matchCmd(message, "off") != null){
-                    if(isActive(channel)) {
-                        deactivate(channel);
+                    if(botRepository.isActiveOnChannel(channel.getId())) {
+                        botRepository.deactivateOnChannel(channel.getId());
                         return "> *off for: " + channel.getName() + "*";
                     } else {
                         return "> *was not active on this channel*";
@@ -96,7 +114,7 @@ public class MessageHandler {
                 if(matchCmd(message, "status") != null){
 
                     String activeChannels =
-                                    getActiveChannels(session)
+                                    getActiveChannels()
                                     .stream()
                                     .map(SlackChannel::getName)
                                     .collect(Collectors.joining(", "));
@@ -105,13 +123,13 @@ public class MessageHandler {
                         activeChannels = "*none*";
                     }
 
-                    String languages = Arrays.stream(TranslateUtil.Lang.values())
+                    String languages = Arrays.stream(Lang.values())
                             .map(Enum::name)
                             .collect(Collectors.joining(", "));
 
                     return "> *status*\n" +
                             "supported languages: " + languages  + "\n" +
-                            "minimum certainty: " + minCert + "%\n" +
+                            "minimum certainty: " + botRepository.getMinimumConfidence() + "%\n" +
                             "active channels: " + activeChannels;
                 }
 
@@ -119,10 +137,9 @@ public class MessageHandler {
                     return "> *help* \n" + helpMsg;
                 }
 
-                if(matchCmd(message, "meta") != null){
-                    String meta = getMetaFromManifest();
-                    meta += "Host: " + getHostName();
-                    return "> *meta* \n " + meta;
+                if(matchCmd(message, "botInfo") != null){
+                    String buildInfo = BotInfo.getInfo("\n");
+                    return "> *botInfo* \n " + buildInfo;
                 }
 
                 String[] minCertWild = matchCmd(message, "setMinCert", "*");
@@ -166,82 +183,42 @@ public class MessageHandler {
     }
 
     private static String getHelpMsg(){
-        StringBuilder helpMsg = new StringBuilder();
-        helpMsg.append("status - print status\n");
-        helpMsg.append("on - activate on current channel \n");
-        helpMsg.append("off - deactivate on current channel\n");
-        helpMsg.append("meta - print bot metadata\n");
-        helpMsg.append("setMinCert (INT range (0,100) - set minimum certainty for language detection\n");
-        return helpMsg.toString();
+        return "status - print status\n" +
+               "on - activate on current channel \n" +
+               "off - deactivate on current channel\n" +
+               "botInfo - print bot build information and current host\n" +
+               "setMinCert (INT range (0,100) - set minimum certainty for language detection\n";
     }
 
-    private static final Pattern matchUserIdPattern = Pattern.compile("(<)(.*?)(>)");
-    private static final String matchSmileyPattern = "(:)(.*?)(:)";
-
-    public String replaceUserIds(String message, SlackSession session){
-
-        Matcher m = matchUserIdPattern.matcher(message);
-        while (m.find()) {
-            String match = m.group();
-            String originalMatch = match;
-            match = match.replace("<", "");
-            match = match.replace(">", "");
-            match = match.replace("@", "");
-
-            //slack get username by id
-
-            SlackUser user = session.findUserById(match);
-            if(user != null){
-                String username = user.getUserName();
-                message = message.replaceFirst(originalMatch, "@" + username);
+    private Collection<SlackChannel> getActiveChannels(){
+        List<SlackChannel> channels = new ArrayList<>();
+        for(String channelId : botRepository.getActiveChannelIds()){
+            SlackChannel channel = slackSession.findChannelById(channelId);
+            if(channel != null){
+                channels.add(channel);
             }
         }
-        return message;
+        return channels;
     }
 
-    public String removeSmileys(String message){
-        return message.replaceAll(matchSmileyPattern, "");
-    }
+    private void sendReplyMessage(String message, SlackMessagePosted event){
 
-    public String getMetaFromManifest(){
+        SlackChannel channel = event.getChannel();
 
-        Class clazz = MessageHandler.class;
-        String className = clazz.getSimpleName() + ".class";
-        String classPath = clazz.getResource(className).toString();
-
-        if (classPath.startsWith("jar")) {
-
-            String manifestPath = classPath.substring(0, classPath.lastIndexOf("!") + 1) + "/META-INF/MANIFEST.MF";
-            Manifest manifest = null;
-            try {
-                manifest = new Manifest(new URL(manifestPath).openStream());
-            } catch (IOException e) {
-                logger.error("Error while reading jar manifest: ", e);
-                return "";
-            }
-
-            Attributes attr = manifest.getMainAttributes();
-            StringBuilder metaBuilder = new StringBuilder();
-            attr.entrySet().stream().forEach(objectObjectEntry -> {
-                metaBuilder.append(objectObjectEntry.getKey() + ": " + objectObjectEntry.getValue() + "\n");
-            });
-            return metaBuilder.toString();
+        String replyTimeStamp;
+        if(event.getThreadTimestamp() != null){
+            replyTimeStamp = event.getThreadTimestamp();
+        } else {
+            replyTimeStamp = event.getTimeStamp();
         }
 
-        return "";
-    }
+        SlackPreparedMessage msg =
+                new SlackPreparedMessage.Builder()
+                        .withThreadTimestamp(replyTimeStamp)
+                        .withMessage(message)
+                        .build();
 
-    public String getHostName(){
-        String hostname;
-        try
-        {
-            InetAddress addr = InetAddress.getLocalHost();
-            hostname = addr.getHostName();
-        }
-        catch (UnknownHostException ex){
-            hostname = "unknown";
-        }
-        return hostname;
+        slackSession.sendMessage(channel, msg);
     }
 
 }

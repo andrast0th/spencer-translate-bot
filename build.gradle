@@ -53,7 +53,7 @@ task fatJarPlus(type: Jar) {
                 'Built-By': System.getProperty('user.name'),
                 'Built-JDK': System.getProperty('java.version'),
                 'Build-Time': new Date().format("yyyy-MM-dd HH:mm:ss z"),
-                'Main-Class': 'co.atoth.spencertranslatebot.SpencerTranslateBotMain'
+                'Main-Class': 'co.atoth.spencertranslatebot.MainClass'
         )
     }
 }
