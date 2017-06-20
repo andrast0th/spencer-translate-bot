@@ -1,7 +1,7 @@
 package co.atoth.spencertranslatebot.translation;
 
 public enum Lang {
-    IW("il"), RO("ro");
+    IW("il"), RO("ro"), HU("hu");
 
     public String country;
 
