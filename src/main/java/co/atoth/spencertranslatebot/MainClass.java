@@ -23,7 +23,7 @@ public class MainClass {
 
     private static final Logger logger = LoggerFactory.getLogger(MainClass.class);
 
-    private static MessageHandler messageHandler;
+    private static boolean listenerAdded = false;
 
     public static void main(String[] args) throws IOException {
 
@@ -84,36 +84,27 @@ public class MainClass {
 
         slackSession.addSlackConnectedListener((event, session) -> {
             if(event.getConnectedPersona().getId().equals(session.sessionPersona().getId())){
+                if(!listenerAdded){
+                    logger.info("Bot has connected to slack, botId: " + session.sessionPersona().getId());
 
-                logger.info("Bot has connected to slack, botId: " + session.sessionPersona().getId());
+                    TranslationService translationService = new TranslationService(googleTranslateApiKey);
 
-                TranslationService translationService = new TranslationService(googleTranslateApiKey);
+                    BotRepository botRepository = initBotRepository(session, commandLine);
+                    if(botRepository == null){
+                        logger.error("Failed to create bot repository, exiting");
+                        System.exit(-1);
+                    }
 
-                BotRepository botRepository = initBotRepository(session, commandLine);
-                if(botRepository == null){
-                    logger.error("Failed to create bot repository, exiting");
-                    System.exit(-1);
-                }
+                    MessageHandler messageHandler = new MessageHandler(botRepository, translationService);
 
-                messageHandler = new MessageHandler(botRepository, translationService);
+                    logger.info("MessageHandler regitered, listening for messages...");
+                    session.addMessagePostedListener(messageHandler);
 
-                logger.info("MessageHandler regitered, listening for messages...");
-                session.addMessagePostedListener(messageHandler);
+                    if(commandLine.hasOption("alertUserName")){
+                        alertUser(true, session, commandLine.getOptionValue("alertUserName"));
+                    }
 
-                if(commandLine.hasOption("alertUserName")){
-                    alertUser(true, session, commandLine.getOptionValue("alertUserName"));
-                }
-            }
-        });
-
-        slackSession.addSlackDisconnectedListener((event, session) -> {
-            if(event.getDisconnectedPersona().getId().equals(session.sessionPersona().getId())){
-                logger.info("Bot has disconnected from slack, botId: " + session.sessionPersona().getId());
-                logger.info("MessageHandler unregistered...");
-                session.removeMessagePostedListener(messageHandler);
-
-                if(commandLine.hasOption("alertUserName")){
-                    alertUser(false, session, commandLine.getOptionValue("alertUserName"));
+                    listenerAdded = true;
                 }
             }
         });
@@ -121,15 +112,15 @@ public class MainClass {
         slackSession.connect();
     }
 
-    private static void alertUser(boolean hasConencted, SlackSession session, String userName){
+    private static void alertUser(boolean hasConnected, SlackSession session, String userName){
         SlackUser user = session.findUserByUserName(userName);
 
         if(user!=null){
-            String message = "hasConencted: " + hasConencted + "\n" + BotInfo.getInfo("\n");
+            String message = "hasConencted: " + hasConnected + "\n" + BotInfo.getInfo("\n");
             session.sendMessageToUser(user, new SlackPreparedMessage.Builder().withMessage(message).build());
-            logger.debug("Failed to send hasConnected " + hasConencted + " alert to userName " + userName);
+            logger.debug("Failed to send hasConnected " + hasConnected + " alert to userName " + userName);
         } else {
-            logger.debug("Failed to send hasConnected " + hasConencted + " alert to userName " + userName);
+            logger.debug("Failed to send hasConnected " + hasConnected + " alert to userName " + userName);
         }
     }
 
