@@ -21,7 +21,7 @@ public class TranslationService {
     private static final Logger logger = LoggerFactory.getLogger(TranslationService.class);
     private static final DecimalFormat df = new DecimalFormat("#");
 
-    private static final Lang[] translatedLanguages = new Lang[]{Lang.IW, Lang.RO};
+    private static final Lang[] translatedLanguages = Lang.values();
     private static final String TRANSLATE_TO_LANG = "en";
 
     private Translate translate;
